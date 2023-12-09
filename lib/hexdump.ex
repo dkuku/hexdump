@@ -50,15 +50,19 @@ defmodule Hexdump do
   @printable_range 0x20..0x7F
   @column_divider "  "
   @newline "\n"
+  @header "   offset    0 1  2 3  4 5  6 7  8 9  A B  C D  E F    printable data\n"
 
   @doc """
-  restores previous inspect function
+  Restores the standard inspect function
   """
   def off do
     Inspect.Opts.default_inspect_fun(&Inspect.inspect/2)
   end
 
-  @default_hexdump_inspect_opts %Inspect.Opts{printable_limit: 500, binaries: :as_binaries}
+  @doc """
+  Enables the custom inspect function
+  """
+  @default_hexdump_inspect_opts %Inspect.Opts{printable_limit: 5, binaries: :as_binaries}
   def on(opts \\ @default_hexdump_inspect_opts) do
     opts =
       case opts do
@@ -70,6 +74,9 @@ defmodule Hexdump do
     Inspect.Opts.default_inspect_fun(&hexdump_inspect_fun(&1, struct(&2, opts)))
   end
 
+  @doc """
+  Custom inspect function
+  """
   def hexdump_inspect_fun(term, opts) when not is_binary(term) do
     Inspect.inspect(term, %{opts | base: :hex})
   end
@@ -85,14 +92,17 @@ defmodule Hexdump do
     end
   end
 
+  @doc """
+  Formatter used in the custom inspect function
+  """
   def format_hexdump_output(term, opts \\ @default_hexdump_inspect_opts) do
     {:ok, string_io} = StringIO.open(term)
 
     result =
       string_io
       |> IO.binstream(2)
-      |> Stream.take(opts.printable_limit)
       |> Stream.chunk_every(8)
+      |> take_or_infinity(opts.printable_limit)
       |> Stream.map(
         &{
           # generates the text: AABB CCDD EEFF 1122 3344 5566 7788 9900
@@ -106,6 +116,12 @@ defmodule Hexdump do
       |> Stream.with_index()
       |> Enum.map_join(@newline, fn {{chunk, original_text}, index} ->
         [
+          if index == 0 do
+            @header
+          else
+            []
+          end,
+          @column_divider,
           # generates the first column 00001
           String.pad_leading("#{index}", 6, "0"),
           # last 0 and divider in the first column
@@ -121,4 +137,7 @@ defmodule Hexdump do
     StringIO.close(string_io)
     result
   end
+
+  defp take_or_infinity(stream, :infinity), do: stream
+  defp take_or_infinity(stream, limit), do: Stream.take(stream, limit)
 end
