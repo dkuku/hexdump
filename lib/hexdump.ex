@@ -1,9 +1,13 @@
 defmodule Hexdump do
   @moduledoc """
   Hexdump makes it easier to work with binary data
+
   By default elixir display binaries as a list of integers in the range from 0..255
+
   This make it problematic to spot binary patterns
+
   our example binary:
+
   ```
   term = <<0,1,2,3,4>> <> "123abcdefxyz" <> <<253,254,255>>
   ```
@@ -22,8 +26,11 @@ defmodule Hexdump do
   ```
 
   With Hexdump you can see similar output like hex editors have:
+
   The first column is offset
+
   second shows a row of 16 bits in binary
+
   last column shows printable characers
 
   ```
@@ -32,6 +39,7 @@ defmodule Hexdump do
   ```
 
   You can switch between hexdump output by calling:
+
   ```
   Hexdump.on()
   Hexdump.off()
