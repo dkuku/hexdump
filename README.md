@@ -26,21 +26,11 @@
   0x78, 0x79, 0x7A, 0xFD, 0xFE, 0xFF>>
   ```
 
-  With Hexdump you can see similar output like in hex editors [example](example.html)
+  With Hexdump you can see similar output like in hex editors
 
   ![livebook example](livebook.png)
   ![terminal example](terminal.png)
 
-  The first column is offset
-
-  second shows a row of 16 bits in binary
-
-  last column shows printable characers
-
-  ```
-  0000000  0001 0203 0431 3233 6162 6364 6566 7879   .....123abcdefxy
-  0000010  7AFD FEFF                                 z...
-  ```
   You can switch between hexdump output by calling:
 
   ```
