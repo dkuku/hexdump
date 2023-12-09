@@ -94,28 +94,72 @@ defmodule Hexdump do
 
   @doc """
   Formatter used in the custom inspect function
+  colors meaning:
+
+   - grey: zero byte 0x00
+   - green: whitespace
+   - yellow: ascii non printable
+   - red: non ascii char
+   - cyan: printable character
   """
   def format_hexdump_output(term, opts \\ @default_hexdump_inspect_opts) do
     {:ok, string_io} = StringIO.open(term)
 
     result =
       string_io
-      |> IO.binstream(2)
-      |> Stream.chunk_every(8)
+      |> IO.binstream(1)
+      |> Stream.chunk_every(16)
       |> take_or_infinity(opts.printable_limit)
       |> Stream.map(
-        &{
-          # generates the text: AABB CCDD EEFF 1122 3344 5566 7788 9900
-          Enum.map_join(&1, " ", fn two_chars -> Base.encode16(two_chars) end),
-          # generates the text: abc...def1234567
-          for <<char::size(8) <- Enum.join(&1, "")>> do
-            if Enum.member?(@printable_range, char), do: <<char>>, else: "."
+        &for char <- &1 do
+          <<ascii>> = char
+
+          cond do
+            ascii == 0x00 ->
+              [IO.ANSI.light_black(), Base.encode16(char), "⋄"]
+
+            ascii == 0x20 ->
+              [IO.ANSI.reset(), Base.encode16(char), " "]
+
+            ascii in [0x09, 0x0A, 0x0C, 0x0D] ->
+              [IO.ANSI.green(), Base.encode16(char), "_"]
+
+            ascii > 0x7F ->
+              [IO.ANSI.light_red(), Base.encode16(char), "×"]
+
+            Enum.member?(
+              @printable_range,
+              ascii
+            ) ->
+              [IO.ANSI.cyan(), Base.encode16(char), char]
+
+            true ->
+              [IO.ANSI.yellow(), Base.encode16(char), "•"]
           end
-        }
+        end
       )
       |> Stream.with_index()
-      |> Enum.map_join(@newline, fn {{chunk, original_text}, index} ->
+      |> Enum.map_join(@newline, fn {chunk, index} ->
+        length = length(chunk)
+
+        chunk =
+          if length < 16 do
+            chunk ++ Enum.map(1..(16 - length), fn _ -> ["", "  ", ""] end)
+          else
+            chunk
+          end
+
+        {binary_representation, original_text} =
+          chunk
+          |> Enum.with_index()
+          |> Enum.map(fn {[ascii_color, binary, printable], index} ->
+            space = if rem(index, 2) == 1, do: " ", else: ""
+            {[ascii_color, binary, space], [ascii_color, printable]}
+          end)
+          |> Enum.unzip()
+
         [
+          IO.ANSI.light_black(),
           if index == 0 do
             @header
           else
@@ -128,9 +172,11 @@ defmodule Hexdump do
           "0:",
           @column_divider,
           # empty spaces for the last row when it's not full width
-          String.pad_trailing(chunk, 40, " "),
+          # String.pad_trailing(chunk, 40, " "),
+          binary_representation,
           @column_divider,
-          original_text
+          original_text,
+          IO.ANSI.reset()
         ]
       end)
 

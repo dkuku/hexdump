@@ -10,7 +10,8 @@ defmodule Hexdump.MixProject do
       description: description(),
       package: package(),
       deps: deps(),
-      source_url: "https://github.com/dkuku/hexdump"
+      source_url: "https://github.com/dkuku/hexdump",
+      docs: docs()
     ]
   end
 
@@ -36,6 +37,12 @@ defmodule Hexdump.MixProject do
       files: ~w(lib .formatter.exs mix.exs README*),
       licenses: ["Apache-2.0"],
       links: %{"GitHub" => "https://github.com/dkuku/hexdump"}
+    ]
+  end
+
+  defp docs() do
+    [
+      extras: ["README.md"]
     ]
   end
 end
