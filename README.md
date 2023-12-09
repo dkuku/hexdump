@@ -28,6 +28,9 @@
 
   With Hexdump you can see similar output like in hex editors [example](example.html)
 
+  ![livebook example](livebook.png)
+  ![terminal example](terminal.png)
+
   The first column is offset
 
   second shows a row of 16 bits in binary
