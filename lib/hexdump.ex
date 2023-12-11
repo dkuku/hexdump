@@ -50,6 +50,7 @@ defmodule Hexdump do
 
   @printable_range 0x20..0x7F
   @column_divider "  "
+  @bytes_count 16
   @newline "\n"
   @header "   offset    0 1  2 3  4 5  6 7  8 9  A B  C D  E F    printable data"
 
@@ -109,49 +110,32 @@ defmodule Hexdump do
     result =
       string_io
       |> IO.binstream(1)
-      |> Stream.chunk_every(16)
+      |> Stream.chunk_every(@bytes_count)
       |> take_or_infinity(opts.printable_limit)
       |> Stream.map(
         &for char <- &1 do
           <<ascii>> = char
           encoded = Base.encode16(char)
 
-          cond do
+          case ascii do
             # zero byte
-            ascii == 0x00 -> [IO.ANSI.light_black(), encoded, "⋄"]
+            0x00 -> [IO.ANSI.light_black(), encoded, "⋄"]
             # space
-            ascii == 0x20 -> [IO.ANSI.reset(), encoded, " "]
+            0x20 -> [IO.ANSI.reset(), encoded, " "]
             # other whitespace
-            ascii in [0x09, 0x0A, 0x0C, 0x0D] -> [IO.ANSI.green(), encoded, "_"]
+            ascii when ascii in [0x09, 0x0A, 0x0C, 0x0D] -> [IO.ANSI.green(), encoded, "_"]
             # non ascii
-            ascii > 0x7F -> [IO.ANSI.light_red(), encoded, "×"]
+            ascii when ascii >= 0x80 -> [IO.ANSI.light_red(), encoded, "×"]
             # ascii printable
-            ascii in @printable_range -> [IO.ANSI.cyan(), encoded, char]
+            ascii when ascii in @printable_range -> [IO.ANSI.cyan(), encoded, char]
             # ascii non printable
-            true -> [IO.ANSI.yellow(), encoded, "•"]
+            _ -> [IO.ANSI.yellow(), encoded, "•"]
           end
         end
       )
       |> Stream.with_index()
       |> Enum.map(fn {chunk, index} ->
-        length = length(chunk)
-
-        # add padding to last line when it has less that 16 bytes
-        chunk =
-          if length < 16 do
-            chunk ++ Enum.map(1..(16 - length), fn _ -> ["", "  ", ""] end)
-          else
-            chunk
-          end
-
-        {binary_representation, original_text} =
-          chunk
-          |> Enum.with_index()
-          |> Enum.map(fn {[ascii_color, binary, printable], index} ->
-            space = if rem(index, 2) == 1, do: " ", else: ""
-            {[ascii_color, binary, space], [ascii_color, printable]}
-          end)
-          |> Enum.unzip()
+        {binary_representation, original_text} = build_line_text(chunk)
 
         [
           @column_divider,
@@ -179,6 +163,25 @@ defmodule Hexdump do
   """
   def remove_escapes(string) do
     Regex.replace(~r<\x1B([@-_]|[\x80-\x9F])[0-?]*[ -/]*[@-~]>, string, "")
+  end
+
+  defp maybe_pad_chunk(chunk) when length(chunk) == @bytes_count, do: chunk
+
+  defp maybe_pad_chunk(chunk) do
+    # add padding to last line when it has less that 16 bytes
+
+    chunk ++ Enum.map(1..(@bytes_count - length(chunk)), fn _ -> ["", "  ", ""] end)
+  end
+
+  defp build_line_text(chunk) do
+    chunk
+    |> maybe_pad_chunk()
+    |> Enum.with_index()
+    |> Enum.map(fn {[ascii_color, binary, printable], index} ->
+      optional_space = if rem(index, 2) == 1, do: " ", else: ""
+      {[ascii_color, binary, optional_space], [ascii_color, printable]}
+    end)
+    |> Enum.unzip()
   end
 
   defp take_or_infinity(stream, :infinity), do: stream
