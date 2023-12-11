@@ -47,6 +47,7 @@ defmodule Hexdump do
   Hexdump.on(binaries: :as_strings)
   ```
   """
+
   @printable_range 0x20..0x7F
   @column_divider "  "
   @newline "\n"
@@ -115,24 +116,30 @@ defmodule Hexdump do
           <<ascii>> = char
 
           cond do
+            # zero byte
             ascii == 0x00 ->
               [IO.ANSI.light_black(), Base.encode16(char), "⋄"]
 
+            # space
             ascii == 0x20 ->
               [IO.ANSI.reset(), Base.encode16(char), " "]
 
+            # other whitespace
             ascii in [0x09, 0x0A, 0x0C, 0x0D] ->
               [IO.ANSI.green(), Base.encode16(char), "_"]
 
+            # non ascii
             ascii > 0x7F ->
               [IO.ANSI.light_red(), Base.encode16(char), "×"]
 
+            # ascii printable
             Enum.member?(
               @printable_range,
               ascii
             ) ->
               [IO.ANSI.cyan(), Base.encode16(char), char]
 
+            # ascii non printable
             true ->
               [IO.ANSI.yellow(), Base.encode16(char), "•"]
           end
@@ -182,6 +189,10 @@ defmodule Hexdump do
 
     StringIO.close(string_io)
     result
+  end
+
+  def remove_escapes(string) do
+    Regex.replace(~r<\x1B([@-_]|[\x80-\x9F])[0-?]*[ -/]*[@-~]>, string, "")
   end
 
   defp take_or_infinity(stream, :infinity), do: stream
