@@ -126,7 +126,7 @@ defmodule Hexdump do
             # non ascii
             ascii > 0x7F -> [IO.ANSI.light_red(), encoded, "×"]
             # ascii printable
-            Enum.member?(@printable_range, ascii) -> [IO.ANSI.cyan(), encoded, char]
+            ascii in @printable_range -> [IO.ANSI.cyan(), encoded, char]
             # ascii non printable
             true -> [IO.ANSI.yellow(), encoded, "•"]
           end
