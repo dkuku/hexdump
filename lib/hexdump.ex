@@ -51,7 +51,7 @@ defmodule Hexdump do
   @printable_range 0x20..0x7F
   @column_divider "  "
   @newline "\n"
-  @header "   offset    0 1  2 3  4 5  6 7  8 9  A B  C D  E F    printable data\n"
+  @header "   offset    0 1  2 3  4 5  6 7  8 9  A B  C D  E F    printable data"
 
   @doc """
   Restores the standard inspect function
@@ -114,41 +114,29 @@ defmodule Hexdump do
       |> Stream.map(
         &for char <- &1 do
           <<ascii>> = char
+          encoded = Base.encode16(char)
 
           cond do
             # zero byte
-            ascii == 0x00 ->
-              [IO.ANSI.light_black(), Base.encode16(char), "⋄"]
-
+            ascii == 0x00 -> [IO.ANSI.light_black(), encoded, "⋄"]
             # space
-            ascii == 0x20 ->
-              [IO.ANSI.reset(), Base.encode16(char), " "]
-
+            ascii == 0x20 -> [IO.ANSI.reset(), encoded, " "]
             # other whitespace
-            ascii in [0x09, 0x0A, 0x0C, 0x0D] ->
-              [IO.ANSI.green(), Base.encode16(char), "_"]
-
+            ascii in [0x09, 0x0A, 0x0C, 0x0D] -> [IO.ANSI.green(), encoded, "_"]
             # non ascii
-            ascii > 0x7F ->
-              [IO.ANSI.light_red(), Base.encode16(char), "×"]
-
+            ascii > 0x7F -> [IO.ANSI.light_red(), encoded, "×"]
             # ascii printable
-            Enum.member?(
-              @printable_range,
-              ascii
-            ) ->
-              [IO.ANSI.cyan(), Base.encode16(char), char]
-
+            Enum.member?(@printable_range, ascii) -> [IO.ANSI.cyan(), encoded, char]
             # ascii non printable
-            true ->
-              [IO.ANSI.yellow(), Base.encode16(char), "•"]
+            true -> [IO.ANSI.yellow(), encoded, "•"]
           end
         end
       )
       |> Stream.with_index()
-      |> Enum.map_join(@newline, fn {chunk, index} ->
+      |> Enum.map(fn {chunk, index} ->
         length = length(chunk)
 
+        # add padding to last line when it has less that 16 bytes
         chunk =
           if length < 16 do
             chunk ++ Enum.map(1..(16 - length), fn _ -> ["", "  ", ""] end)
@@ -166,31 +154,29 @@ defmodule Hexdump do
           |> Enum.unzip()
 
         [
-          IO.ANSI.light_black(),
-          if index == 0 do
-            @header
-          else
-            []
-          end,
           @column_divider,
           # generates the first column 00001
           String.pad_leading("#{index}", 6, "0"),
-          # last 0 and divider in the first column
+          # last 0 in the offset column
           "0:",
           @column_divider,
-          # empty spaces for the last row when it's not full width
-          # String.pad_trailing(chunk, 40, " "),
           binary_representation,
           @column_divider,
           original_text,
           IO.ANSI.reset()
         ]
       end)
+      |> List.insert_at(0, [IO.ANSI.light_black(), @header])
+      |> Enum.join(@newline)
 
     StringIO.close(string_io)
     result
   end
 
+  @doc """
+  Replace terminal escape sequences with empty string.
+  Used for removing coloring from the generated string.
+  """
   def remove_escapes(string) do
     Regex.replace(~r<\x1B([@-_]|[\x80-\x9F])[0-?]*[ -/]*[@-~]>, string, "")
   end
