@@ -4,7 +4,8 @@ defmodule HexdumpTest do
 
   describe "format_hexdump_output/2" do
     test "adds padding to binary" do
-      assert Hexdump.format_hexdump_output("abcd")
+      assert "abcd"
+             |> Hexdump.format_hexdump_output()
              |> Hexdump.remove_escapes() ==
                """
                   offset    0 1  2 3  4 5  6 7  8 9  A B  C D  E F    printable data
@@ -14,7 +15,8 @@ defmodule HexdumpTest do
     end
 
     test "prints multiline" do
-      assert Hexdump.format_hexdump_output("1234567890abcdef1234567890abcdef")
+      assert "1234567890abcdef1234567890abcdef"
+             |> Hexdump.format_hexdump_output()
              |> Hexdump.remove_escapes() ==
                """
                   offset    0 1  2 3  4 5  6 7  8 9  A B  C D  E F    printable data
