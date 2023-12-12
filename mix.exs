@@ -4,8 +4,8 @@ defmodule Hexdump.MixProject do
   def project do
     [
       app: :hexdump,
-      version: "0.1.3",
-      elixir: "~> 1.15",
+      version: "0.1.4",
+      elixir: "~> 1.14",
       start_permanent: Mix.env() == :prod,
       description: description(),
       package: package(),

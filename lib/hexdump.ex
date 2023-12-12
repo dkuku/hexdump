@@ -64,14 +64,9 @@ defmodule Hexdump do
   @doc """
   Enables the custom inspect function
   """
-  @default_hexdump_inspect_opts %Inspect.Opts{printable_limit: 5, binaries: :as_binaries}
+  @default_hexdump_inspect_opts %Inspect.Opts{printable_limit: 32, binaries: :as_binaries}
   def on(opts \\ @default_hexdump_inspect_opts) do
-    opts =
-      case opts do
-        opts when is_struct(opts) -> Map.from_struct(opts)
-        opts when is_list(opts) -> Map.new(opts)
-        opts -> opts
-      end
+    opts = get_opts(opts)
 
     Inspect.Opts.default_inspect_fun(&hexdump_inspect_fun(&1, struct(&2, opts)))
   end
@@ -90,8 +85,46 @@ defmodule Hexdump do
          (bins == :infer and String.printable?(term, printable_limit)) do
       Inspect.inspect(term, opts)
     else
-      @newline <> format_hexdump_output(term, opts) <> @newline
+      hexdump_output(term, opts)
     end
+  end
+
+  @doc """
+  When printable limit is smaller than the size of binary we only display
+  the amount of bytes plus last line of the binary
+  """
+  def hexdump_output(term, opts \\ @default_hexdump_inspect_opts) do
+    opts = get_opts(opts)
+    size = byte_size(term)
+    last_line = rem(size, 16)
+    last_line = if last_line == 0, do: 16, else: last_line
+
+    if size > opts.printable_limit do
+      IO.ANSI.light_black() <>
+        @header <>
+        @newline <>
+        format_hexdump_output(:binary.part(term, 0, opts.printable_limit)) <>
+        generate_last_line(term, size, last_line)
+    else
+      IO.ANSI.light_black() <>
+        @header <>
+        @newline <>
+        format_hexdump_output(term, opts) <> @newline
+    end
+  end
+
+  defp generate_last_line(term, size, last_line) do
+    @newline <>
+      @column_divider <>
+      "**" <>
+      @newline <>
+      (term
+       |> :binary.part(size - last_line, last_line)
+       |> format_hexdump_output()
+       |> String.replace(
+         "000000",
+         String.pad_leading("#{trunc((size - last_line) / 16)}", 6, "0")
+       ))
   end
 
   @doc """
@@ -134,10 +167,11 @@ defmodule Hexdump do
         end
       )
       |> Stream.with_index()
-      |> Enum.map(fn {chunk, index} ->
+      |> Stream.map(fn {chunk, index} ->
         {binary_representation, original_text} = build_line_text(chunk)
 
         [
+          IO.ANSI.light_black(),
           @column_divider,
           # generates the first column 00001
           String.pad_leading("#{index}", 6, "0"),
@@ -150,7 +184,6 @@ defmodule Hexdump do
           IO.ANSI.reset()
         ]
       end)
-      |> List.insert_at(0, [IO.ANSI.light_black(), @header])
       |> Enum.join(@newline)
 
     StringIO.close(string_io)
@@ -163,6 +196,14 @@ defmodule Hexdump do
   """
   def remove_escapes(string) do
     Regex.replace(~r<\x1B([@-_]|[\x80-\x9F])[0-?]*[ -/]*[@-~]>, string, "")
+  end
+
+  defp get_opts(opts) do
+    case opts do
+      opts when is_struct(opts) -> Map.from_struct(opts)
+      opts when is_list(opts) -> Map.new(opts)
+      opts -> opts
+    end
   end
 
   defp maybe_pad_chunk(chunk) when length(chunk) == @bytes_count, do: chunk
